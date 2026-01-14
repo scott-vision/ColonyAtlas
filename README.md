@@ -20,6 +20,8 @@ Users can upload single images or batches of plate images, automatically segment
 - Export-ready quantitative outputs (CSV / Parquet)
 
 ---
+
+```markdown
 ## High-Level Architecture
 
 ```text
