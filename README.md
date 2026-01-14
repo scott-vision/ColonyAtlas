@@ -276,3 +276,7 @@ results/
 ## Summary
 
 **ColonyAtlas** transforms raw colony images into quantitative, explorable morphology data, enabling rigorous biological insight through a single coherent platform.
+
+## Development
+
+See `docs/DEV.md` for local and Docker run instructions.
