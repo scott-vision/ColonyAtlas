@@ -21,7 +21,7 @@ Users can upload single images or batches of plate images, automatically segment
 
 ---
 
-```markdown
+
 ## High-Level Architecture
 
 ```text
@@ -56,6 +56,7 @@ Users can upload single images or batches of plate images, automatically segment
 
 
 ---
+```
 
 ## Core Workflow
 
