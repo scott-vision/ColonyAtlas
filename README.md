@@ -20,40 +20,37 @@ Users can upload single images or batches of plate images, automatically segment
 - Export-ready quantitative outputs (CSV / Parquet)
 
 ---
-
 ## High-Level Architecture
 
-┌────────────────────────────┐
-│ Frontend (ColonyAtlas UI) │
-│ • React / Next.js │
-│ • Tailwind CSS │
-│ • Interactive plots │
-│ • Colony inspection │
-└──────────────┬─────────────┘
-│ REST / JSON
-┌──────────────▼─────────────┐
-│ Backend (FastAPI) │
-│ • Upload & job control │
-│ • Inference orchestration │
-│ • Feature extraction │
-│ • Results API │
-└──────────────┬─────────────┘
-│
-┌──────────────▼─────────────┐
-│ ML & Analysis Pipeline │
-│ • Object detection │
-│ • SAM-prompted masks │
-│ • Instance segmentation │
-│ • Morphology metrics │
-└──────────────┬─────────────┘
-│
-┌──────────────▼─────────────┐
-│ Storage & Outputs │
-│ • Images & overlays │
-│ • Masks │
-│ • Metrics tables │
-│ • QC flags & embeddings │
-└────────────────────────────┘
+```text
++---------------------------+        REST / JSON         +---------------------------+
+| Frontend (ColonyAtlas UI) |  <-----------------------> | Backend (FastAPI)         |
+| - React / Next.js         |                            | - Upload & job control    |
+| - Tailwind CSS            |                            | - Inference orchestration |
+| - Image + mask overlay    |                            | - Feature extraction      |
+| - Interactive plots       |                            | - Results API             |
++-------------+-------------+                            +-------------+-------------+
+              |                                                        |
+              |                                                        |
+              |                                                        |
+              v                                                        v
+     +---------------------------+                          +---------------------------+
+     | Browser state / UI events |                          | ML & Analysis Pipeline    |
+     | - selected colony_id      |                          | - Detection               |
+     | - active filters          |                          | - SAM box-prompt masks    |
+     | - plot selections         |                          | - Instance segmentation   |
+     +---------------------------+                          | - QC + post-processing    |
+                                                            | - Morphology metrics     |
+                                                            +-------------+-------------+
+                                                                          |
+                                                                          v
+                                                            +---------------------------+
+                                                            | Storage & Outputs         |
+                                                            | - Images & overlays       |
+                                                            | - Masks (per colony)      |
+                                                            | - Tables (CSV/Parquet)    |
+                                                            | - Embeddings (PCA/UMAP)   |
+                                                            +---------------------------+
 
 
 ---
@@ -192,17 +189,22 @@ ColonyAtlas quantifies within-plate and between-condition variability using:
 ## Data Outputs
 
 results/
-├── images/
-│ ├── original/
-│ └── overlays/
-├── masks/
-│ └── colony_masks/
-├── tables/
-│ ├── colonies.csv
-│ ├── plates.csv
-│ └── qc_flags.csv
-└── embeddings/
-└── pca_umap.parquet
+  plates/
+    <plate_id>/
+      images/
+        original.png
+        overlay.png
+      masks/
+        colony_<colony_id>.png
+      tables/
+        colonies.csv
+        qc_flags.csv
+        plate_summary.csv
+      embeddings/
+        pca.csv
+        umap.csv
+  index.csv
+
 
 
 ---
