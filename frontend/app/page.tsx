@@ -1,7 +1,7 @@
 export default function Home() {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center gap-8 text-center">
-      <img src="/Logo.png" alt="ColonyAtlas logo" className="h-28 w-28 rounded-2xl" />
+      <img src="/Logo.png" alt="ColonyAtlas logo" className="h-32 w-32 rounded-2xl" />
       <div className="max-w-2xl space-y-4">
         <h1 className="text-3xl font-semibold text-slate-100 md:text-4xl">
           ColonyAtlas

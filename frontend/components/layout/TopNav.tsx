@@ -10,10 +10,10 @@ export default function TopNav() {
   return (
     <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3">
           <img src="/Logo.png" alt="ColonyAtlas logo" className="h-8 w-8 rounded-lg" />
           <span className="text-lg font-semibold">ColonyAtlas</span>
-        </div>
+        </Link>
         <nav className="flex items-center gap-4 text-sm">
           {navItems.map((item) => (
             <Link
