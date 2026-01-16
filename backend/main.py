@@ -512,13 +512,20 @@ def image_to_data_uri(image_path: str) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def generate_report_files(plate: Plate, colonies: List[Colony]) -> Dict[str, str]:
+def generate_report_files(
+    plate: Plate, colonies: List[Colony], use_mm_units: bool
+) -> Dict[str, str]:
     plate_dir = os.path.join(REPORTS_DIR, plate.id)
     os.makedirs(plate_dir, exist_ok=True)
     size_boxplot_path = os.path.join(plate_dir, "metrics_boxplot_size.png")
     shape_boxplot_path = os.path.join(plate_dir, "metrics_boxplot_shape.png")
+    size_metrics = ["area", "perimeter"]
+    size_title = "Size Metrics (pixels)"
+    if use_mm_units:
+        size_metrics = ["area_mm2", "perimeter_mm"]
+        size_title = "Size Metrics (mm)"
     generate_boxplot_image(
-        colonies, ["area", "perimeter"], size_boxplot_path, "Size Metrics (pixels)"
+        colonies, size_metrics, size_boxplot_path, size_title
     )
     generate_boxplot_image(
         colonies,
@@ -788,9 +795,10 @@ async def export_plate_report(plate_id: str, format: str = "md"):
     if not plate:
         raise HTTPException(status_code=404, detail="Plate not found")
     colonies = COLONIES_BY_PLATE.get(plate_id, [])
-    assets = generate_report_files(plate, colonies)
     attributes = plate.attributes or PlateAttributes()
     derived = plate.derived_stats
+    use_mm_units = derived.get("mm_per_pixel", "N/A") != "N/A"
+    assets = generate_report_files(plate, colonies, use_mm_units=use_mm_units)
 
     if format == "md":
         original_uri = image_to_data_uri(assets["original"]) if assets["original"] else ""

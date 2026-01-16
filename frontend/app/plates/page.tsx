@@ -71,6 +71,16 @@ export default function PlatesPage() {
         <div className="rounded-2xl border border-red-800 bg-red-950/50 p-6 text-sm text-red-200">
           {error}
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-300">
+          <p className="mb-3">No results yet, upload an image to get started.</p>
+          <a
+            href="/upload"
+            className="inline-flex rounded-full bg-cyan-500/90 px-4 py-2 text-xs font-semibold text-slate-900"
+          >
+            Go to Upload
+          </a>
+        </div>
       ) : (
         <div className="space-y-3">
           {analyzingId ? (
