@@ -5,9 +5,9 @@ import type { Colony } from "../../lib/types";
 
 function getColonyColor(colony: Colony, colourBy: string) {
   if (colourBy === "qc") {
-    return colony.qc_flags.length > 0 ? "#f59e0b" : "#22d3ee";
+    return colony.qc_flags.length > 0 ? "#f59e0b" : "#0ea5e9";
   }
-  return "#22d3ee";
+  return "#0ea5e9";
 }
 
 export default function ImageViewer({
@@ -93,7 +93,8 @@ export default function ImageViewer({
                           d={buildPath(pathPoints)}
                           fill="transparent"
                           stroke={outlineColor}
-                          strokeWidth={2}
+                          strokeWidth={3}
+                          pointerEvents="none"
                         />
                       ))
                     : null}
