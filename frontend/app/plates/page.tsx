@@ -72,7 +72,17 @@ export default function PlatesPage() {
           {error}
         </div>
       ) : (
-        <PlateGrid plates={filtered} onAnalyze={handleAnalyze} analyzingId={analyzingId} />
+        <div className="space-y-3">
+          {analyzingId ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+              <div className="mb-2">Segmenting plate...</div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                <div className="h-full w-1/2 animate-pulse rounded-full bg-cyan-400" />
+              </div>
+            </div>
+          ) : null}
+          <PlateGrid plates={filtered} onAnalyze={handleAnalyze} analyzingId={analyzingId} />
+        </div>
       )}
     </div>
   );

@@ -29,6 +29,7 @@ export default function UploadPage() {
     Record<string, PlateAttributesDraft>
   >({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const router = useRouter();
 
   const handleFilesSelected = (incoming: File[]) => {
@@ -102,11 +103,14 @@ export default function UploadPage() {
   const handleAnalyzeAll = async () => {
     if (uploadedPlates.length === 0) return;
     setError(null);
+    setIsAnalyzing(true);
     try {
       await analyzePlates({ plate_ids: uploadedPlates.map((plate) => plate.id) });
       router.push("/plates");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -170,10 +174,16 @@ export default function UploadPage() {
             <button
               type="button"
               onClick={handleAnalyzeAll}
-              className="w-full rounded-xl bg-cyan-500/90 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-cyan-400"
+              disabled={isAnalyzing}
+              className="w-full rounded-xl bg-cyan-500/90 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Segment Plates
+              {isAnalyzing ? "Segmenting..." : "Segment Plates"}
             </button>
+            {isAnalyzing ? (
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                <div className="h-full w-1/2 animate-pulse rounded-full bg-cyan-400" />
+              </div>
+            ) : null}
           </div>
         </Panel>
       ) : null}

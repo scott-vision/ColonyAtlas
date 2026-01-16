@@ -26,8 +26,10 @@ export default function MaskPreview({
       const cropY = Math.max(0, y - padding);
       const cropW = Math.min(img.width - cropX, w + padding * 2);
       const cropH = Math.min(img.height - cropY, h + padding * 2);
-      canvas.width = 240;
-      canvas.height = 180;
+      const targetWidth = 240;
+      const aspect = cropH / cropW;
+      canvas.width = targetWidth;
+      canvas.height = Math.max(120, Math.round(targetWidth * aspect));
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
     };
