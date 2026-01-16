@@ -34,15 +34,17 @@ export default function MetricScatter({
   onChangeYMetric: (metric: MetricKey) => void;
   onSelectColony: (colonyId: string) => void;
 }) {
+  const xKey = xMetric === "area" ? "area_mm2" : xMetric;
+  const yKey = yMetric === "area" ? "area_mm2" : yMetric;
   const plotData = useMemo(() => {
-    const x = colonies.map((colony) => colony.metrics[xMetric] || 0);
-    const y = colonies.map((colony) => colony.metrics[yMetric] || 0);
+    const x = colonies.map((colony) => colony.metrics[xKey] ?? colony.metrics[xMetric] ?? 0);
+    const y = colonies.map((colony) => colony.metrics[yKey] ?? colony.metrics[yMetric] ?? 0);
     const customdata = colonies.map((colony) => colony.id);
     const colors = colonies.map((colony) =>
       pointColor(colony, colourBy, colony.id === selectedColonyId)
     );
     return { x, y, customdata, colors };
-  }, [colonies, xMetric, yMetric, colourBy, selectedColonyId]);
+  }, [colonies, xKey, yKey, xMetric, yMetric, colourBy, selectedColonyId]);
 
   return (
     <div className="space-y-3">
@@ -93,8 +95,14 @@ export default function MetricScatter({
             plot_bgcolor: "#0f172a",
             font: { color: "#cbd5f5", size: 10 },
             margin: { l: 55, r: 10, t: 10, b: 45 },
-            xaxis: { title: METRIC_LABELS[xMetric], automargin: true },
-            yaxis: { title: METRIC_LABELS[yMetric], automargin: true },
+            xaxis: {
+              title: xMetric === "area" ? "Area (mm^2)" : METRIC_LABELS[xMetric],
+              automargin: true
+            },
+            yaxis: {
+              title: yMetric === "area" ? "Area (mm^2)" : METRIC_LABELS[yMetric],
+              automargin: true
+            },
             showlegend: false
           }}
           config={{ displayModeBar: false }}
