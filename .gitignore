@@ -30,3 +30,4 @@ backend/data/
 .vscode/
 .idea/
 
+notebooks/sam2_b.pt

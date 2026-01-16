@@ -17,6 +17,7 @@ export default function ImageViewer({
   selectedColonyId,
   hoveredColonyId,
   showMasks,
+  showOutlines,
   showIds,
   colourBy,
   onHoverColony,
@@ -28,18 +29,25 @@ export default function ImageViewer({
   selectedColonyId: string | null;
   hoveredColonyId: string | null;
   showMasks: boolean;
+  showOutlines: boolean;
   showIds: boolean;
   colourBy: "id" | "qc" | "cluster" | "condition";
   onHoverColony: (colonyId: string | null) => void;
   onSelectColony: (colonyId: string) => void;
 }) {
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
-  const displayUrl = overlayImageUrl || baseImageUrl;
+  const displayUrl = showMasks && overlayImageUrl ? overlayImageUrl : baseImageUrl;
 
   const hovered = useMemo(
     () => colonies.find((colony) => colony.id === hoveredColonyId),
     [colonies, hoveredColonyId]
   );
+
+  const buildPath = (outline: { x: number; y: number }[]) => {
+    if (!outline.length) return "";
+    const [first, ...rest] = outline;
+    return `M ${first.x} ${first.y} ${rest.map((p) => `L ${p.x} ${p.y}`).join(" ")} Z`;
+  };
 
   return (
     <div className="space-y-3">
@@ -63,6 +71,7 @@ export default function ImageViewer({
               const isSelected = colony.id === selectedColonyId;
               const isHovered = colony.id === hoveredColonyId;
               const color = getColonyColor(colony, colourBy);
+              const outlineColor = isSelected ? "#ef4444" : "#22c55e";
               return (
                 <g key={colony.id}>
                   <rect
@@ -77,6 +86,17 @@ export default function ImageViewer({
                     onMouseLeave={() => onHoverColony(null)}
                     onClick={() => onSelectColony(colony.id)}
                   />
+                  {showOutlines && colony.outline
+                    ? colony.outline.map((pathPoints, index) => (
+                        <path
+                          key={`${colony.id}-outline-${index}`}
+                          d={buildPath(pathPoints)}
+                          fill="transparent"
+                          stroke={outlineColor}
+                          strokeWidth={2}
+                        />
+                      ))
+                    : null}
                   {isSelected || isHovered ? (
                     <circle
                       cx={colony.centroid.x}

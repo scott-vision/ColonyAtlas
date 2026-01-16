@@ -14,6 +14,7 @@ interface DashboardState {
   filters: FiltersState;
   colourBy: "id" | "qc" | "cluster" | "condition";
   showMasks: boolean;
+  showOutlines: boolean;
   showIds: boolean;
   xMetric: MetricKey;
   yMetric: MetricKey;
@@ -25,6 +26,7 @@ type Action =
   | { type: "hoverColony"; colonyId: string | null }
   | { type: "setColourBy"; colourBy: DashboardState["colourBy"] }
   | { type: "toggleMasks" }
+  | { type: "toggleOutlines" }
   | { type: "toggleIds" }
   | { type: "setXMetric"; metric: MetricKey }
   | { type: "setYMetric"; metric: MetricKey }
@@ -37,6 +39,7 @@ const initialState: DashboardState = {
   filters: { qcFlags: [], metricRanges: {} },
   colourBy: "id",
   showMasks: true,
+  showOutlines: false,
   showIds: false,
   xMetric: METRIC_KEYS[0],
   yMetric: METRIC_KEYS[3]
@@ -52,8 +55,22 @@ function reducer(state: DashboardState, action: Action): DashboardState {
       return { ...state, hoveredColonyId: action.colonyId };
     case "setColourBy":
       return { ...state, colourBy: action.colourBy };
-    case "toggleMasks":
-      return { ...state, showMasks: !state.showMasks };
+    case "toggleMasks": {
+      const next = !state.showMasks;
+      return {
+        ...state,
+        showMasks: next,
+        showOutlines: next ? false : state.showOutlines
+      };
+    }
+    case "toggleOutlines": {
+      const next = !state.showOutlines;
+      return {
+        ...state,
+        showOutlines: next,
+        showMasks: next ? false : state.showMasks
+      };
+    }
     case "toggleIds":
       return { ...state, showIds: !state.showIds };
     case "setXMetric":

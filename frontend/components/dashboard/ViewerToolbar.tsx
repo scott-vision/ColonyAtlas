@@ -2,16 +2,20 @@
 
 export default function ViewerToolbar({
   showMasks,
+  showOutlines,
   showIds,
   colourBy,
   onToggleMasks,
+  onToggleOutlines,
   onToggleIds,
   onChangeColourBy
 }: {
   showMasks: boolean;
+  showOutlines: boolean;
   showIds: boolean;
   colourBy: "id" | "qc" | "cluster" | "condition";
   onToggleMasks: () => void;
+  onToggleOutlines: () => void;
   onToggleIds: () => void;
   onChangeColourBy: (value: "id" | "qc" | "cluster" | "condition") => void;
 }) {
@@ -25,6 +29,15 @@ export default function ViewerToolbar({
         }`}
       >
         {showMasks ? "Masks On" : "Masks Off"}
+      </button>
+      <button
+        type="button"
+        onClick={onToggleOutlines}
+        className={`rounded-full px-3 py-1 ${
+          showOutlines ? "bg-emerald-500/20 text-emerald-200" : "bg-slate-800"
+        }`}
+      >
+        {showOutlines ? "Outlines On" : "Outlines Off"}
       </button>
       <button
         type="button"

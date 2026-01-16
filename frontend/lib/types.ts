@@ -34,6 +34,7 @@ export interface Colony {
   metrics: Record<string, number>;
   qc_flags: string[];
   cluster_id?: string | null;
+  outline?: { x: number; y: number }[][];
 }
 
 export interface AnalyzeRequest {

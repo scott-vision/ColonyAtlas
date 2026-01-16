@@ -47,9 +47,11 @@ function DashboardContent({ plate, colonies }: { plate: Plate; colonies: Colony[
           <div className="space-y-3">
             <ViewerToolbar
               showMasks={state.showMasks}
+              showOutlines={state.showOutlines}
               showIds={state.showIds}
               colourBy={state.colourBy}
               onToggleMasks={() => dispatch({ type: "toggleMasks" })}
+              onToggleOutlines={() => dispatch({ type: "toggleOutlines" })}
               onToggleIds={() => dispatch({ type: "toggleIds" })}
               onChangeColourBy={(value) =>
                 dispatch({ type: "setColourBy", colourBy: value })
@@ -62,6 +64,7 @@ function DashboardContent({ plate, colonies }: { plate: Plate; colonies: Colony[
               selectedColonyId={state.selectedColonyId}
               hoveredColonyId={state.hoveredColonyId}
               showMasks={state.showMasks}
+              showOutlines={state.showOutlines}
               showIds={state.showIds}
               colourBy={state.colourBy}
               onHoverColony={(colonyId) => dispatch({ type: "hoverColony", colonyId })}

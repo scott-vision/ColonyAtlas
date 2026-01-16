@@ -72,6 +72,7 @@ class Colony(BaseModel):
     metrics: Dict[str, float]
     qc_flags: List[str] = Field(default_factory=list)
     cluster_id: Optional[str] = None
+    outline: Optional[List[List[Point]]] = None
 
 
 class PlateAttributes(BaseModel):
@@ -117,7 +118,7 @@ MODEL_TYPE = os.getenv("CELLPOSE_MODEL_TYPE", "cellpose_sam")
 YOLO_MODEL: Optional[YOLO] = None
 YOLO_MODEL_PATH = os.getenv(
     "YOLO_MODEL_PATH",
-    r"C:\Users\3i\Documents\GitHub\ColonyAtlas\notebooks\runs\segment\train11\weights\best.pt",
+    r"C:\Users\3i\Documents\GitHub\ColonyAtlas\notebooks\runs\segment\train12\weights\best.pt",
 )
 SEGMENTATION_METHOD = os.getenv("SEGMENTATION_METHOD", "yolo")
 PLATE_DETECTOR: Optional[YOLO] = None
@@ -230,6 +231,8 @@ def build_colonies_from_masks(
             flags.append("border")
         if median_area and area > median_area * 3:
             flags.append("merged")
+        binary = masks == region.label
+        outlines = extract_outline_points(binary.astype(np.uint8), 1.0, 1.0)
         colony = Colony(
             id=str(uuid.uuid4()),
             plate_id=plate_id,
@@ -249,6 +252,7 @@ def build_colonies_from_masks(
                 "nearest_neighbor_distance": 0.0,
             },
             qc_flags=flags,
+            outline=outlines,
         )
         colonies.append(colony)
         centroids.append((colony.centroid.x, colony.centroid.y))
@@ -302,6 +306,7 @@ def build_colonies_from_instance_masks(
             flags.append("border")
         if median_area and area > median_area * 3:
             flags.append("merged")
+        outlines = extract_outline_points(binary.astype(np.uint8), scale_x, scale_y)
         colony = Colony(
             id=str(uuid.uuid4()),
             plate_id=plate_id,
@@ -329,6 +334,7 @@ def build_colonies_from_instance_masks(
                 "nearest_neighbor_distance": 0.0,
             },
             qc_flags=flags,
+            outline=outlines,
         )
         colonies.append(colony)
         centroids.append((colony.centroid.x, colony.centroid.y))
@@ -387,15 +393,37 @@ def draw_mask_outlines(
         draw.line(points, fill=(0, 255, 255, 255), width=2)
 
 
-def draw_polygon_outlines(
-    draw: ImageDraw.ImageDraw, polygons: List[np.ndarray], scale_x: float, scale_y: float
-) -> None:
-    for poly in polygons:
-        if poly is None or len(poly) < 2:
+def overlay_instance_masks(
+    img_rgb: np.ndarray, masks: List[np.ndarray], alpha: float = 0.45, seed: int = 0
+) -> np.ndarray:
+    out = img_rgb.copy()
+    h, w = out.shape[:2]
+    rng = np.random.default_rng(seed)
+    colors = rng.integers(0, 256, size=(len(masks), 3), dtype=np.uint8)
+    for i, mask in enumerate(masks):
+        if mask is None or mask.shape != (h, w) or not mask.any():
             continue
-        points = [(float(x * scale_x), float(y * scale_y)) for x, y in poly]
-        points.append(points[0])
-        draw.line(points, fill=(0, 255, 255, 255), width=2)
+        color = colors[i]
+        out[mask] = (alpha * color + (1 - alpha) * out[mask]).astype(np.uint8)
+    return out
+
+
+def extract_outline_points(
+    binary: np.ndarray, scale_x: float, scale_y: float
+) -> List[List[Point]]:
+    outlines: List[List[Point]] = []
+    contours = find_contours(binary, 0.5)
+    for contour in contours:
+        if len(contour) < 2:
+            continue
+        step = max(1, len(contour) // 200)
+        points = [
+            Point(x=float(col * scale_x), y=float(row * scale_y))
+            for row, col in contour[::step]
+        ]
+        if points:
+            outlines.append(points)
+    return outlines
 
 
 def build_overlay_from_masks(
@@ -404,14 +432,31 @@ def build_overlay_from_masks(
     plate_circle: Optional[tuple[float, float, float]],
     labeled_mask: Optional[np.ndarray] = None,
     instance_masks: Optional[np.ndarray] = None,
-    instance_polygons: Optional[List[np.ndarray]] = None,
     scale_x: float = 1.0,
     scale_y: float = 1.0,
-    polygon_scale_x: float = 1.0,
-    polygon_scale_y: float = 1.0,
 ) -> str:
-    image = Image.open(image_path).convert("RGBA")
-    overlay = image.copy()
+    image = Image.open(image_path).convert("RGB")
+    rgb = np.asarray(image).astype(np.uint8)
+    masks: List[np.ndarray] = []
+    if instance_masks is not None:
+        for mask in instance_masks:
+            if mask is None:
+                continue
+            binary = mask > 0.5
+            if binary.shape != rgb.shape[:2]:
+                resized = Image.fromarray(binary.astype(np.uint8) * 255).resize(
+                    (rgb.shape[1], rgb.shape[0]), resample=Image.NEAREST
+                )
+                binary = np.asarray(resized) > 0
+            masks.append(binary)
+    elif labeled_mask is not None:
+        for label in np.unique(labeled_mask):
+            if label == 0:
+                continue
+            binary = labeled_mask == label
+            masks.append(binary)
+    overlay_rgb = overlay_instance_masks(rgb, masks, alpha=0.45, seed=0)
+    overlay = Image.fromarray(overlay_rgb).convert("RGBA")
     draw = ImageDraw.Draw(overlay)
     if plate_circle:
         cx, cy, radius = plate_circle
@@ -420,22 +465,6 @@ def build_overlay_from_masks(
             outline=(255, 0, 0, 255),
             width=6,
         )
-    if instance_polygons is not None:
-        draw_polygon_outlines(draw, instance_polygons, polygon_scale_x, polygon_scale_y)
-    elif instance_masks is not None:
-        for mask in instance_masks:
-            if mask is None:
-                continue
-            binary = mask > 0.5
-            if not np.any(binary):
-                continue
-            draw_mask_outlines(draw, binary.astype(np.uint8), scale_x, scale_y)
-    elif labeled_mask is not None:
-        for label in np.unique(labeled_mask):
-            if label == 0:
-                continue
-            binary = labeled_mask == label
-            draw_mask_outlines(draw, binary.astype(np.uint8), 1.0, 1.0)
     overlay_path = os.path.join(OVERLAYS_DIR, plate_id)
     os.makedirs(overlay_path, exist_ok=True)
     output_path = os.path.join(overlay_path, "overlay.png")
@@ -582,12 +611,13 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         image = Image.open(image_path)
         if SEGMENTATION_METHOD == "yolo":
             model = get_yolo_model()
-            results = model.predict(source=image_path, conf=0.25, verbose=False)
+            results = model.predict(
+                source=image_path, conf=0.25, verbose=False, retina_masks=True
+            )
             result = results[0]
             if result.masks is None or result.masks.data is None:
                 colonies = []
                 instance_masks = None
-                instance_polygons = None
                 scale_x = 1.0
                 scale_y = 1.0
             else:
@@ -595,7 +625,6 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
                 mask_height, mask_width = instance_masks.shape[-2], instance_masks.shape[-1]
                 scale_x = image.size[0] / mask_width
                 scale_y = image.size[1] / mask_height
-                instance_polygons = result.masks.xy if result.masks.xy is not None else None
                 colonies = build_colonies_from_instance_masks(
                     instance_masks,
                     plate_id,
@@ -615,7 +644,6 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
             )
             colonies = build_colonies_from_masks(masks, plate_id, image.size[::-1])
             instance_masks = None
-            instance_polygons = None
             scale_x = 1.0
             scale_y = 1.0
             labeled_mask = masks
@@ -626,11 +654,8 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
             plate_circle=plate_circle,
             labeled_mask=None if SEGMENTATION_METHOD == "yolo" else labeled_mask,
             instance_masks=instance_masks if SEGMENTATION_METHOD == "yolo" else None,
-            instance_polygons=instance_polygons if SEGMENTATION_METHOD == "yolo" else None,
             scale_x=scale_x,
             scale_y=scale_y,
-            polygon_scale_x=1.0 if SEGMENTATION_METHOD == "yolo" else scale_x,
-            polygon_scale_y=1.0 if SEGMENTATION_METHOD == "yolo" else scale_y,
         )
         plate.colony_count = len(colonies)
         plate.overlay_url = overlay_url
