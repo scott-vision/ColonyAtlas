@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import logging
+import shutil
 import os
 import uuid
 import math
@@ -241,6 +242,16 @@ def get_yolo_device() -> str:
         logger.info("YOLO device: %s (requested %s)", effective, YOLO_DEVICE)
         YOLO_DEVICE_EFFECTIVE = effective
     return effective
+
+
+def safe_remove_dir(path: str, base_dir: str) -> None:
+    abs_path = os.path.abspath(path)
+    abs_base = os.path.abspath(base_dir)
+    if os.path.commonpath([abs_path, abs_base]) != abs_base:
+        logger.warning("Refusing to remove path outside base: %s", abs_path)
+        return
+    if os.path.exists(abs_path):
+        shutil.rmtree(abs_path, ignore_errors=True)
 
 
 def load_image_array(image_path: str) -> np.ndarray:
@@ -816,6 +827,21 @@ async def update_plate_attributes(plate_id: str, attributes: PlateAttributes) ->
     plate.attributes = attributes
     PLATES[plate_id] = plate
     return plate
+
+
+@app.delete("/plate/{plate_id}")
+async def delete_plate(plate_id: str) -> Dict[str, str]:
+    plate = PLATES.pop(plate_id, None)
+    if not plate:
+        raise HTTPException(status_code=404, detail="Plate not found")
+    COLONIES_BY_PLATE.pop(plate_id, None)
+    image_path = PLATE_IMAGE_PATHS.pop(plate_id, None)
+    if image_path:
+        safe_remove_dir(os.path.dirname(image_path), UPLOADS_DIR)
+    safe_remove_dir(os.path.join(OVERLAYS_DIR, plate_id), OVERLAYS_DIR)
+    safe_remove_dir(os.path.join(REPORTS_DIR, plate_id), REPORTS_DIR)
+    logger.info("Deleted plate: plate_id=%s", plate_id)
+    return {"deleted": plate_id}
 
 
 @app.get("/plate/{plate_id}/colonies", response_model=List[Colony])

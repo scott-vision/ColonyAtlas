@@ -4,11 +4,15 @@ import PlateCard from "./PlateCard";
 export default function PlateGrid({
   plates,
   onAnalyze,
-  analyzingId
+  analyzingId,
+  onDelete,
+  deletingId
 }: {
   plates: Plate[];
   onAnalyze: (plateId: string) => void;
   analyzingId: string | null;
+  onDelete: (plateId: string) => void;
+  deletingId: string | null;
 }) {
   if (plates.length === 0) {
     return (
@@ -26,6 +30,8 @@ export default function PlateGrid({
           plate={plate}
           onAnalyze={onAnalyze}
           isAnalyzing={analyzingId === plate.id}
+          onDelete={onDelete}
+          isDeleting={deletingId === plate.id}
         />
       ))}
     </div>

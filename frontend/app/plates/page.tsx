@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import PlateFilters from "../../components/plates/PlateFilters";
 import PlateGrid from "../../components/plates/PlateGrid";
-import { analyzePlates, getPlates } from "../../lib/api";
+import { analyzePlates, deletePlate, getPlates } from "../../lib/api";
 import type { Plate } from "../../lib/types";
 
 export default function PlatesPage() {
@@ -12,6 +12,7 @@ export default function PlatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -60,6 +61,24 @@ export default function PlatesPage() {
     }
   };
 
+  const handleDelete = async (plateId: string) => {
+    const plate = plates.find((item) => item.id === plateId);
+    const name = plate?.name || "this plate";
+    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(plateId);
+    setError(null);
+    try {
+      await deletePlate(plateId);
+      setPlates((current) => current.filter((item) => item.id !== plateId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete plate");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PlateFilters search={search} onSearch={setSearch} />
@@ -91,7 +110,13 @@ export default function PlatesPage() {
               </div>
             </div>
           ) : null}
-          <PlateGrid plates={filtered} onAnalyze={handleAnalyze} analyzingId={analyzingId} />
+          <PlateGrid
+            plates={filtered}
+            onAnalyze={handleAnalyze}
+            analyzingId={analyzingId}
+            onDelete={handleDelete}
+            deletingId={deletingId}
+          />
         </div>
       )}
     </div>

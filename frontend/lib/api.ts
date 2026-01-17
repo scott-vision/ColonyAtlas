@@ -77,6 +77,13 @@ export async function updatePlateAttributes(plateId: string, attributes: PlateAt
   return check<Plate>(response);
 }
 
+export async function deletePlate(plateId: string) {
+  const response = await fetch(`${API_BASE}/plate/${plateId}`, {
+    method: "DELETE"
+  });
+  return check<{ deleted: string }>(response);
+}
+
 export function getExportUrl(plateId: string) {
   return `${API_BASE}/export/plate/${plateId}/colonies.csv`;
 }
