@@ -26,6 +26,9 @@ pip-wheel-metadata/
 # Backend runtime data
 backend/data/
 
+# Notebooks
+notebooks/*.ipynb
+
 # IDE
 .vscode/
 .idea/
