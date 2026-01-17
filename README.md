@@ -1,6 +1,6 @@
 # ColonyAtlas
 
-![ColonyAtlas logo](frontend/public/Logo.png)
+<img src="frontend/public/Logo.png" alt="ColonyAtlas logo" width="120">
 
 Interactive morphology analysis for bacterial colony plates. ColonyAtlas lets you upload plate images, run automated segmentation, inspect colonies, visualize metrics, and export reports.
 
