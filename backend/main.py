@@ -4,6 +4,7 @@ import base64
 import csv
 import io
 import json
+import logging
 import os
 import uuid
 import math
@@ -28,15 +29,43 @@ from ultralytics import YOLO
 from ultralytics.nn.tasks import SegmentationModel
 import torch
 
+logger = logging.getLogger("colonyatlas")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
 OVERLAYS_DIR = os.path.join(DATA_DIR, "overlays")
 REPORTS_DIR = os.path.join(DATA_DIR, "reports")
+LOGS_DIR = os.path.join(DATA_DIR, "logs")
+LOG_PATH = os.path.join(LOGS_DIR, "backend.log")
 
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(OVERLAYS_DIR, exist_ok=True)
 os.makedirs(REPORTS_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+root_logger = logging.getLogger()
+formatter = logging.Formatter(
+    "%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
+file_handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
+file_handler.setFormatter(formatter)
+root_has_file = any(
+    isinstance(handler, logging.FileHandler) and getattr(handler, "baseFilename", "") == file_handler.baseFilename
+    for handler in root_logger.handlers
+)
+if not root_has_file:
+    root_logger.addHandler(file_handler)
+if not root_logger.handlers:
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    root_logger.addHandler(stream_handler)
+root_logger.setLevel(logging.INFO)
+
+ultralytics_logger = logging.getLogger("ultralytics")
+ultralytics_logger.setLevel(logging.INFO)
+ultralytics_logger.handlers = [file_handler]
+ultralytics_logger.propagate = False
 
 app = FastAPI(title="ColonyAtlas API", version="0.1.0")
 
@@ -135,6 +164,8 @@ PLATE_MODEL_PATH = os.getenv(
     "PLATE_MODEL_PATH",
     os.path.join(BASE_DIR, "plate-weights.pt"),
 )
+YOLO_DEVICE = os.getenv("YOLO_DEVICE", "cuda:0")
+YOLO_DEVICE_EFFECTIVE: Optional[str] = None
 
 QC_FLAG_OPTIONS = ["border", "merged", "low_contrast", "artifact"]
 METRIC_KEYS = [
@@ -198,6 +229,18 @@ def resolve_model_path(path_value: str) -> str:
     if os.path.isabs(path_value):
         return path_value
     return os.path.abspath(os.path.join(BASE_DIR, path_value))
+
+
+def get_yolo_device() -> str:
+    global YOLO_DEVICE_EFFECTIVE
+    if YOLO_DEVICE.startswith("cuda") and not torch.cuda.is_available():
+        effective = "cpu"
+    else:
+        effective = YOLO_DEVICE
+    if YOLO_DEVICE_EFFECTIVE != effective:
+        logger.info("YOLO device: %s (requested %s)", effective, YOLO_DEVICE)
+        YOLO_DEVICE_EFFECTIVE = effective
+    return effective
 
 
 def load_image_array(image_path: str) -> np.ndarray:
@@ -562,11 +605,17 @@ def generate_report_files(
 
 def detect_plate_circle(image_path: str) -> Optional[tuple[float, float, float]]:
     model = get_plate_detector()
-    results = model.predict(source=image_path, conf=0.25, verbose=False)
+    device = get_yolo_device()
+    logger.info("Plate detection start: image=%s device=%s", image_path, device)
+    results = model.predict(
+        source=image_path, conf=0.25, verbose=False, device=device
+    )
     if not results:
+        logger.info("Plate detection: no results")
         return None
     boxes = results[0].boxes
     if boxes is None or boxes.xyxy is None or len(boxes.xyxy) == 0:
+        logger.info("Plate detection: no boxes")
         return None
     x0, y0, x1, y1 = boxes.xyxy[0].tolist()
     midpoints = [
@@ -578,6 +627,7 @@ def detect_plate_circle(image_path: str) -> Optional[tuple[float, float, float]]
     cx = sum(p[0] for p in midpoints) / len(midpoints)
     cy = sum(p[1] for p in midpoints) / len(midpoints)
     radius = sum(math.hypot(p[0] - cx, p[1] - cy) for p in midpoints) / len(midpoints)
+    logger.info("Plate detection: center=(%.1f, %.1f) radius=%.1f", cx, cy, radius)
     return float(cx), float(cy), float(radius)
 
 
@@ -588,6 +638,7 @@ async def upload_images(
 ) -> UploadResponse:
     metadata_map = parse_metadata(metadata)
     plates: List[Plate] = []
+    logger.info("Upload start: files=%d", len(files))
 
     for upload in files:
         plate_id = str(uuid.uuid4())
@@ -598,6 +649,7 @@ async def upload_images(
         content = await upload.read()
         with open(target_path, "wb") as f:
             f.write(content)
+        logger.info("Saved upload: plate_id=%s path=%s bytes=%d", plate_id, target_path, len(content))
         image_url = f"/static/uploads/{plate_id}/{filename}"
         plate = Plate(
             id=plate_id,
@@ -623,6 +675,7 @@ async def upload_images(
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     analyzed: List[str] = []
+    logger.info("Analyze start: plates=%d method=%s", len(request.plate_ids), SEGMENTATION_METHOD)
     for plate_id in request.plate_ids:
         plate = PLATES.get(plate_id)
         if not plate:
@@ -630,11 +683,18 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         image_path = PLATE_IMAGE_PATHS.get(plate_id)
         if not image_path or not os.path.exists(image_path):
             raise HTTPException(status_code=404, detail=f"Image for plate {plate_id} not found")
+        logger.info("Analyze plate: plate_id=%s image=%s", plate_id, image_path)
         image = Image.open(image_path)
         if SEGMENTATION_METHOD == "yolo":
             model = get_yolo_model()
+            device = get_yolo_device()
+            logger.info("YOLO segmentation start: device=%s", device)
             results = model.predict(
-                source=image_path, conf=0.25, verbose=False, retina_masks=True
+                source=image_path,
+                conf=0.25,
+                verbose=False,
+                retina_masks=True,
+                device=device,
             )
             result = results[0]
             if result.masks is None or result.masks.data is None:
@@ -654,6 +714,7 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
                     scale_x=scale_x,
                     scale_y=scale_y,
                 )
+            logger.info("YOLO segmentation done: colonies=%d", len(colonies))
         else:
             model = get_model()
             image_array = load_image_array(image_path)
@@ -669,6 +730,7 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
             scale_x = 1.0
             scale_y = 1.0
             labeled_mask = masks
+            logger.info("Cellpose segmentation done: colonies=%d", len(colonies))
         plate_circle = detect_plate_circle(image_path)
         overlay_url = build_overlay_from_masks(
             image_path,
@@ -728,6 +790,8 @@ async def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         PLATES[plate_id] = plate
         COLONIES_BY_PLATE[plate_id] = colonies
         analyzed.append(plate_id)
+        logger.info("Analyze plate done: plate_id=%s colonies=%d overlay=%s", plate_id, len(colonies), overlay_url)
+    logger.info("Analyze complete: analyzed=%d", len(analyzed))
     return AnalyzeResponse(analyzed=analyzed)
 
 
