@@ -118,13 +118,22 @@ MODEL_TYPE = os.getenv("CELLPOSE_MODEL_TYPE", "cellpose_sam")
 YOLO_MODEL: Optional[YOLO] = None
 YOLO_MODEL_PATH = os.getenv(
     "YOLO_MODEL_PATH",
-    r"C:\Users\3i\Documents\GitHub\ColonyAtlas\notebooks\runs\segment\train12\weights\best.pt",
+    os.path.join(
+        BASE_DIR,
+        "..",
+        "notebooks",
+        "runs",
+        "segment",
+        "train12",
+        "weights",
+        "best.pt",
+    ),
 )
 SEGMENTATION_METHOD = os.getenv("SEGMENTATION_METHOD", "yolo")
 PLATE_DETECTOR: Optional[YOLO] = None
 PLATE_MODEL_PATH = os.getenv(
     "PLATE_MODEL_PATH",
-    r"C:\Users\3i\Documents\GitHub\ColonyAtlas\backend\plate-weights.pt",
+    os.path.join(BASE_DIR, "plate-weights.pt"),
 )
 
 QC_FLAG_OPTIONS = ["border", "merged", "low_contrast", "artifact"]
@@ -173,7 +182,7 @@ def get_yolo_model() -> YOLO:
     global YOLO_MODEL
     if YOLO_MODEL is None:
         torch.serialization.add_safe_globals([SegmentationModel])
-        YOLO_MODEL = YOLO(YOLO_MODEL_PATH)
+        YOLO_MODEL = YOLO(resolve_model_path(YOLO_MODEL_PATH))
     return YOLO_MODEL
 
 
@@ -181,8 +190,14 @@ def get_plate_detector() -> YOLO:
     global PLATE_DETECTOR
     if PLATE_DETECTOR is None:
         torch.serialization.add_safe_globals([SegmentationModel])
-        PLATE_DETECTOR = YOLO(PLATE_MODEL_PATH)
+        PLATE_DETECTOR = YOLO(resolve_model_path(PLATE_MODEL_PATH))
     return PLATE_DETECTOR
+
+
+def resolve_model_path(path_value: str) -> str:
+    if os.path.isabs(path_value):
+        return path_value
+    return os.path.abspath(os.path.join(BASE_DIR, path_value))
 
 
 def load_image_array(image_path: str) -> np.ndarray:
